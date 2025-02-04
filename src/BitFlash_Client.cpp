@@ -1,65 +1,48 @@
 #include "BitFlash_Client.h"
 
-BitFlash_Client::BitFlash_Client(const Config &config)
-    : _config(config), _lastCheck(0), _updateInProgress(false)
-{
+BitFlash_Client::BitFlash_Client(const Config& config) 
+    : _config(config), _lastCheck(0), _updateInProgress(false) {
 }
 
-void BitFlash_Client::begin()
-{
-    if (_config.autoConnect)
-    {
+void BitFlash_Client::begin() {
+    if (_config.autoConnect) {
         connectWiFi();
     }
 }
 
-void BitFlash_Client::handle()
-{
-    if (!_updateInProgress && millis() - _lastCheck >= _config.checkInterval)
-    {
+void BitFlash_Client::handle() {
+    if (!_updateInProgress && millis() - _lastCheck >= _config.checkInterval) {
         checkForUpdate();
         _lastCheck = millis();
     }
 }
 
-void BitFlash_Client::checkForUpdate()
-{
-    if (!isWiFiConnected() && !connectWiFi())
-    {
+void BitFlash_Client::checkForUpdate() {
+    if (!isWiFiConnected() && !connectWiFi()) {
         notifyCallback("WiFi connection failed");
         return;
     }
 
-    if (checkVersion())
-    {
+    if (checkVersion()) {
         notifyCallback("Update available");
     }
 }
-std::unique_ptr<Client> BitFlash_Client::createClient(const String &url)
-{
-    if (url.startsWith("https://"))
-    {
+std::unique_ptr<Client> BitFlash_Client::createClient(const String& url) {
+    if (url.startsWith("https://")) {
         auto secureClient = std::make_unique<WiFiClientSecure>();
-
+        
         // SSL verification settings
-        if (_config.verifySSL)
-        {
+        if (_config.verifySSL) {
             // Add root CA certificate if verification is needed
             // secureClient->setCACert(rootCACertificate);
-        }
-        else
-        {
+        } else {
             secureClient->setInsecure();
         }
-
+        
         return secureClient;
-    }
-    else if (url.startsWith("http://"))
-    {
+    } else if (url.startsWith("http://")) {
         return std::make_unique<WiFiClient>();
-    }
-    else
-    {
+    } else {
         notifyCallback("Invalid URL protocol");
         return nullptr;
     }
@@ -71,7 +54,7 @@ HTTPClient* BitFlash_Client::createHTTPClient(Client* client, const String& url)
     HTTPClient* https = new HTTPClient();
     
     if (url.startsWith("https://")) {
-        WiFiClientSecure* secureClient = static_cast<WiFiClientSecure*>(client);
+        WiFiClientSecure* secureClient = dynamic_cast<WiFiClientSecure*>(client);
         if (secureClient) {
             https->begin(*secureClient, url);
         } else {
@@ -80,7 +63,7 @@ HTTPClient* BitFlash_Client::createHTTPClient(Client* client, const String& url)
             return nullptr;
         }
     } else if (url.startsWith("http://")) {
-        WiFiClient* regularClient = static_cast<WiFiClient*>(client);
+        WiFiClient* regularClient = dynamic_cast<WiFiClient*>(client);
         if (regularClient) {
             https->begin(*regularClient, url);
         } else {
@@ -113,22 +96,6 @@ bool BitFlash_Client::checkVersion() {
         _updateInProgress = false;
         return false;
     }
-    
-    // Add query parameter for device ID
-    String endpoint = _config.jsonEndpoint;
-    if (strchr(_config.jsonEndpoint, '?') == nullptr) {
-        endpoint += "?id=";
-    } else {
-        endpoint += "&id=";
-    }
-    endpoint += _config.id;
-    
-    // Modify the HTTPClient to use the new URL with ID
-    https->end();
-    delete https;
-    
-    client = createClient(endpoint);
-    https = createHTTPClient(client.get(), endpoint);
     
     int httpCode = https->GET();
     if (httpCode != HTTP_CODE_OK) {
@@ -168,62 +135,54 @@ bool BitFlash_Client::checkVersion() {
     return false;
 }
 
-bool BitFlash_Client::performUpdate(const char *firmwareUrl)
-{
+bool BitFlash_Client::performUpdate(const char* firmwareUrl) {
     // Create appropriate client for firmware download
     auto client = createClient(firmwareUrl);
-    if (!client)
-    {
+    if (!client) {
         _updateInProgress = false;
         return false;
     }
-
+    
     // Create HTTPClient
-    HTTPClient *https = createHTTPClient(client.get(), firmwareUrl);
-    if (!https)
-    {
+    HTTPClient* https = createHTTPClient(client.get(), firmwareUrl);
+    if (!https) {
         _updateInProgress = false;
         return false;
     }
-
+    
     int httpCode = https->GET();
-    if (httpCode != HTTP_CODE_OK)
-    {
+    if (httpCode != HTTP_CODE_OK) {
         notifyCallback("Failed to download firmware");
         https->end();
         delete https;
         _updateInProgress = false;
         return false;
     }
-
+    
     int contentLength = https->getSize();
-    if (contentLength <= 0)
-    {
+    if (contentLength <= 0) {
         notifyCallback("Invalid firmware size");
         https->end();
         delete https;
         _updateInProgress = false;
         return false;
     }
-
-    if (!Update.begin(contentLength))
-    {
+    
+    if (!Update.begin(contentLength)) {
         notifyCallback("Not enough space for update");
         https->end();
         delete https;
         _updateInProgress = false;
         return false;
     }
-
-    WiFiClient *stream = https->getStreamPtr();
+    
+    WiFiClient* stream = https->getStreamPtr();
     size_t written = 0;
-    uint8_t buff[1024] = {0};
-
-    while (https->connected() && (written < contentLength))
-    {
+    uint8_t buff[1024] = { 0 };
+    
+    while (https->connected() && (written < contentLength)) {
         size_t size = stream->available();
-        if (size)
-        {
+        if (size) {
             int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
             written += Update.write(buff, c);
             int progress = (written * 100) / contentLength;
@@ -231,89 +190,75 @@ bool BitFlash_Client::performUpdate(const char *firmwareUrl)
         }
         yield();
     }
-
+    
     https->end();
     delete https;
-
-    if (written != contentLength)
-    {
+    
+    if (written != contentLength) {
         notifyCallback("Download incomplete");
         Update.abort();
         _updateInProgress = false;
         return false;
     }
-
-    if (!Update.end())
-    {
+    
+    if (!Update.end()) {
         notifyCallback("Update failed");
         _updateInProgress = false;
         return false;
     }
-
+    
     notifyCallback("Update complete, restarting...");
     delay(1000);
     ESP.restart();
     return true;
 }
 
-bool BitFlash_Client::connectWiFi()
-{
-    if (isWiFiConnected())
-        return true;
-
+bool BitFlash_Client::connectWiFi() {
+    if (isWiFiConnected()) return true;
+    
     WiFi.begin(_config.ssid, _config.password);
-
+    
     int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 20)
-    {
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
         delay(500);
         attempts++;
     }
-
-    if (isWiFiConnected())
-    {
+    
+    if (isWiFiConnected()) {
         setClock();
         return true;
     }
-
+    
     return false;
 }
 
-void BitFlash_Client::disconnectWiFi()
-{
+void BitFlash_Client::disconnectWiFi() {
     WiFi.disconnect();
 }
 
-bool BitFlash_Client::isWiFiConnected()
-{
+bool BitFlash_Client::isWiFiConnected() {
     return WiFi.status() == WL_CONNECTED;
 }
 
-void BitFlash_Client::setClock()
-{
+void BitFlash_Client::setClock() {
     configTime(0, 0, "pool.ntp.org");
     time_t now = time(nullptr);
-    while (now < 8 * 3600 * 2)
-    {
+    while (now < 8 * 3600 * 2) {
         delay(500);
         now = time(nullptr);
     }
 }
 
-void BitFlash_Client::setCheckInterval(uint32_t interval)
-{
+void BitFlash_Client::setCheckInterval(uint32_t interval) {
     _config.checkInterval = interval;
 }
 
-void BitFlash_Client::setCallback(std::function<void(const char *status, int progress)> callback)
-{
+void BitFlash_Client::setCallback(std::function<void(const char* status, int progress)> callback) {
     _callback = callback;
 }
 
-void BitFlash_Client::notifyCallback(const char *status, int progress)
-{
-    if (_callback)
-    {
+void BitFlash_Client::notifyCallback(const char* status, int progress) {
+    if (_callback) {
         _callback(status, progress);
     }
 }
