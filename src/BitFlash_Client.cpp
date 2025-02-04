@@ -29,35 +29,86 @@ void BitFlash_Client::checkForUpdate() {
 }
 
 bool BitFlash_Client::checkVersion() {
-    WiFiClientSecure client;
-    client.setInsecure();
+    // Check if URL starts with https
+    bool isHttps = strncmp(_config.jsonEndpoint, "https://", 8) == 0;
     
-    HTTPClient https;
-    https.begin(client, _config.jsonEndpoint);
-    
-    int httpCode = https.GET();
-    if (httpCode != HTTP_CODE_OK) {
-        notifyCallback("Failed to fetch version info");
+    if (isHttps) {
+        // HTTPS connection
+        WiFiClientSecure client;
+        client.setInsecure();
+        
+        HTTPClient https;
+        if (!https.begin(client, _config.jsonEndpoint)) {
+            notifyCallback("Failed to connect to HTTPS endpoint");
+            return false;
+        }
+        
+        int httpCode = https.GET();
+        if (httpCode != HTTP_CODE_OK) {
+            notifyCallback("Failed to fetch version info");
+            Serial.printf("HTTP Error: %d\n", httpCode);
+            https.end();
+            return false;
+        }
+        
+        String payload = https.getString();
         https.end();
-        return false;
-    }
-    
-    StaticJsonDocument<512> doc;
-    DeserializationError error = deserializeJson(doc, https.getString());
-    https.end();
-    
-    if (error) {
-        notifyCallback("Failed to parse version info");
-        return false;
-    }
-    
-    const char* latestVersion = doc["version"];
-    const char* firmwareUrl = doc["firmware_url"];
-    
-    if (strcmp(latestVersion, _config.currentVersion) > 0) {
-        _updateInProgress = true;
-        performUpdate(firmwareUrl);
-        return true;
+        
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, payload);
+        
+        if (error) {
+            notifyCallback("Failed to parse version info");
+            return false;
+        }
+        
+        const char* latestVersion = doc["version"];
+        const char* firmwareUrl = doc["firmware_url"];
+        
+        if (strcmp(latestVersion, _config.currentVersion) > 0) {
+            _updateInProgress = true;
+            performUpdate(firmwareUrl);
+            return true;
+        }
+    } else {
+        // HTTP connection
+        WiFiClient client;
+        HTTPClient http;
+        
+        if (!http.begin(client, _config.jsonEndpoint)) {
+            notifyCallback("Failed to connect to HTTP endpoint");
+            return false;
+        }
+        
+        int httpCode = http.GET();
+        if (httpCode != HTTP_CODE_OK) {
+            notifyCallback("Failed to fetch version info");
+            Serial.printf("HTTP Error: %d\n", httpCode);
+            http.end();
+            return false;
+        }
+        
+        String payload = http.getString();
+        http.end();
+        
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, payload);
+        
+        if (error) {
+            notifyCallback("Failed to parse version info");
+            Serial.println("JSON Parse Error: " + String(error.c_str()));
+            Serial.println("Received payload: " + payload);
+            return false;
+        }
+        
+        const char* latestVersion = doc["version"];
+        const char* firmwareUrl = doc["firmware_url"];
+        
+        if (strcmp(latestVersion, _config.currentVersion) > 0) {
+            _updateInProgress = true;
+            performUpdate(firmwareUrl);
+            return true;
+        }
     }
     
     return false;
