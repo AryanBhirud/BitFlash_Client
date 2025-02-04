@@ -12,8 +12,9 @@ BitFlash_Client::Config config = {
     .ssid = "your_wifi_ssid",
     .password = "your_wifi_password",
     .currentVersion = "1.0.0",
-    .jsonEndpoint = "https://your-server.com/firmware/version.json",
-    .checkInterval = 5000, // Check every 5 seconds
+    .jsonEndpoint = "http://192.168.59.87:3030/",
+    .deviceId = "device_001",  // Unique identifier for your device
+    .checkInterval = 1000, // Check every second
     .autoConnect = true
 };
 
