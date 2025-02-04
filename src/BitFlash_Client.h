@@ -12,17 +12,16 @@
 class BitFlash_Client
 {
 public:
-    struct Config
-    {
-        const char *ssid;
-        const char *password;
-        const char *currentVersion;
-        const char *jsonEndpoint;
-        const char *deviceId;   // New field for device ID
-        uint32_t checkInterval; // In milliseconds
-        bool autoConnect;       // Whether to auto-connect to WiFi
-        bool verifySSL = false; // Whether to verify SSL certificates
-    };
+    struct Config {
+    const char* ssid;
+    const char* password;
+    const char* currentVersion;
+    const char* jsonEndpoint;
+    const char* id;  // New field for device ID
+    uint32_t checkInterval;  // In milliseconds
+    bool autoConnect;        // Whether to auto-connect to WiFi
+    bool verifySSL = false; // Whether to verify SSL certificates
+};
 
     BitFlash_Client(const Config &config);
 

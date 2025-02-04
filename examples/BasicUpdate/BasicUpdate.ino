@@ -9,12 +9,12 @@ void updateCallback(const char* status, int progress) {
 }
 
 BitFlash_Client::Config config = {
-    .ssid = "your_wifi_ssid",
-    .password = "your_wifi_password",
+    .ssid = "gheepodidosa",
+    .password = "hehehehe",
     .currentVersion = "1.0.0",
-    .jsonEndpoint = "http://192.168.59.87:3030/",
-    .deviceId = "device_001",  // Unique identifier for your device
-    .checkInterval = 1000, // Check every second
+    .jsonEndpoint = "http://192.168.63.87:3030/",
+    .id = "001",  // Unique identifier for your device
+    .checkInterval = 1000, // Check every 5 seconds
     .autoConnect = true
 };
 

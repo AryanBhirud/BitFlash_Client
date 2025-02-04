@@ -110,76 +110,73 @@ HTTPClient *BitFlash_Client::createHTTPClient(Client *client, const String &url)
     return https;
 }
 
-bool BitFlash_Client::checkVersion()
-{
+bool BitFlash_Client::checkVersion() {
     _updateInProgress = true;
-
-    // Prepare the JSON payload with device ID
-    StaticJsonDocument<256> idPayload;
-    idPayload["id"] = _config.deviceId;
-
-    String payloadString;
-    serializeJson(idPayload, payloadString);
-
+    
     // Create appropriate client
     auto client = createClient(_config.jsonEndpoint);
-    if (!client)
-    {
+    if (!client) {
         _updateInProgress = false;
         return false;
     }
-
+    
     // Create HTTPClient
-    HTTPClient *https = createHTTPClient(client.get(), _config.jsonEndpoint);
-    if (!https)
-    {
+    HTTPClient* https = createHTTPClient(client.get(), _config.jsonEndpoint);
+    if (!https) {
         _updateInProgress = false;
         return false;
     }
-
-    // Add content type header
-    https->addHeader("Content-Type", "application/json");
-
-    // Send POST request with device ID
-    int httpCode = https->POST(payloadString);
-    if (httpCode != HTTP_CODE_OK)
-    {
+    
+    // Add query parameter for device ID
+    String endpoint = _config.jsonEndpoint;
+    if (strchr(_config.jsonEndpoint, '?') == nullptr) {
+        endpoint += "?id=";
+    } else {
+        endpoint += "&id=";
+    }
+    endpoint += _config.id;
+    
+    // Modify the HTTPClient to use the new URL with ID
+    https->end();
+    delete https;
+    
+    client = createClient(endpoint);
+    https = createHTTPClient(client.get(), endpoint);
+    
+    int httpCode = https->GET();
+    if (httpCode != HTTP_CODE_OK) {
         notifyCallback("Failed to fetch version info");
-        Serial.printf("HTTP Error: %d\n", httpCode);
         https->end();
         delete https;
         _updateInProgress = false;
         return false;
     }
-
+    
     StaticJsonDocument<1024> doc;
     DeserializationError error = deserializeJson(doc, https->getString());
-
+    
     https->end();
     delete https;
-
-    if (error)
-    {
+    
+    if (error) {
         notifyCallback("Failed to parse version info");
         _updateInProgress = false;
         return false;
     }
-
-    const char *latestVersion = doc["version"];
-    const char *firmwareUrl = doc["firmware_url"];
-
-    if (!latestVersion || !firmwareUrl)
-    {
+    
+    const char* latestVersion = doc["version"];
+    const char* firmwareUrl = doc["firmware_url"];
+    
+    if (!latestVersion || !firmwareUrl) {
         notifyCallback("Invalid version info format");
         _updateInProgress = false;
         return false;
     }
-
-    if (compareVersions(_config.currentVersion, latestVersion) < 0)
-    {
+    
+    if (compareVersions(_config.currentVersion, latestVersion) < 0) {
         return performUpdate(firmwareUrl);
     }
-
+    
     _updateInProgress = false;
     return false;
 }
