@@ -54,7 +54,7 @@ HTTPClient* BitFlash_Client::createHTTPClient(Client* client, const String& url)
     HTTPClient* https = new HTTPClient();
     
     if (url.startsWith("https://")) {
-        WiFiClientSecure* secureClient = dynamic_cast<WiFiClientSecure*>(client);
+        WiFiClientSecure* secureClient = static_cast<WiFiClientSecure*>(client);
         if (secureClient) {
             https->begin(*secureClient, url);
         } else {
@@ -63,7 +63,7 @@ HTTPClient* BitFlash_Client::createHTTPClient(Client* client, const String& url)
             return nullptr;
         }
     } else if (url.startsWith("http://")) {
-        WiFiClient* regularClient = dynamic_cast<WiFiClient*>(client);
+        WiFiClient* regularClient = static_cast<WiFiClient*>(client);
         if (regularClient) {
             https->begin(*regularClient, url);
         } else {
@@ -261,4 +261,26 @@ void BitFlash_Client::notifyCallback(const char* status, int progress) {
     if (_callback) {
         _callback(status, progress);
     }
+}
+
+int BitFlash_Client::compareVersions(const char* v1, const char* v2) {
+    // Parse versions into components
+    int major1, minor1, patch1;
+    int major2, minor2, patch2;
+    
+    sscanf(v1, "%d.%d.%d", &major1, &minor1, &patch1);
+    sscanf(v2, "%d.%d.%d", &major2, &minor2, &patch2);
+    
+    // Compare major version
+    if (major1 != major2) {
+        return major1 - major2;
+    }
+    
+    // Compare minor version
+    if (minor1 != minor2) {
+        return minor1 - minor2;
+    }
+    
+    // Compare patch version
+    return patch1 - patch2;
 }
