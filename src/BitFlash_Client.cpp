@@ -65,48 +65,35 @@ std::unique_ptr<Client> BitFlash_Client::createClient(const String &url)
     }
 }
 
-HTTPClient *BitFlash_Client::createHTTPClient(Client *client, const String &url)
-{
-    if (!client)
-        return nullptr;
-
-    HTTPClient *https = new HTTPClient();
-
-    if (url.startsWith("https://"))
-    {
-        WiFiClientSecure *secureClient = dynamic_cast<WiFiClientSecure *>(client);
-        if (secureClient)
-        {
+HTTPClient* BitFlash_Client::createHTTPClient(Client* client, const String& url) {
+    if (!client) return nullptr;
+    
+    HTTPClient* https = new HTTPClient();
+    
+    if (url.startsWith("https://")) {
+        WiFiClientSecure* secureClient = static_cast<WiFiClientSecure*>(client);
+        if (secureClient) {
             https->begin(*secureClient, url);
-        }
-        else
-        {
+        } else {
             notifyCallback("Failed to create secure client");
             delete https;
             return nullptr;
         }
-    }
-    else if (url.startsWith("http://"))
-    {
-        WiFiClient *regularClient = dynamic_cast<WiFiClient *>(client);
-        if (regularClient)
-        {
+    } else if (url.startsWith("http://")) {
+        WiFiClient* regularClient = static_cast<WiFiClient*>(client);
+        if (regularClient) {
             https->begin(*regularClient, url);
-        }
-        else
-        {
+        } else {
             notifyCallback("Failed to create client");
             delete https;
             return nullptr;
         }
-    }
-    else
-    {
+    } else {
         notifyCallback("Invalid URL protocol");
         delete https;
         return nullptr;
     }
-
+    
     return https;
 }
 
