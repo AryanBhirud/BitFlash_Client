@@ -20,5 +20,6 @@
     "platforms": "espressif32",
     "dependencies": {
       "bblanchon/ArduinoJson": "^6.21.3"
-    }
+    },
+    "homepage": "https://github.com/AryanBhirud/BitFlash_Client/"
   }
